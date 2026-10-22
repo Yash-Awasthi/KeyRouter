@@ -4,6 +4,14 @@ A Cloudflare Worker that hands out disposable API keys. You store a real provide
 
 It works with Anthropic, OpenAI, Gemini, Azure OpenAI, OpenRouter, DeepSeek, Groq, Mistral, xAI and any other provider with an OpenAI- or Anthropic-style API. It runs on the Cloudflare free plan.
 
+---
+
+## 📸 Screenshots
+
+<a href="docs/screenshots/showcase.jpg"><img src="docs/screenshots/showcase.jpg" width="100%" alt="KeyRouter new gateway key form and the key usage page"></a>
+
+---
+
 ## What a gateway key can do
 
 - Expire at a set time. The real key is erased from storage at expiry.

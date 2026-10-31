@@ -310,7 +310,15 @@ function cors(res, req) {
 const allowed = (patterns, model) =>
   typeof model === "string" && patterns.some((p) => (p.endsWith("*") ? model.startsWith(p.slice(0, -1)) : p === model));
 
-const authHeader = (style = "bearer", key) => (style === "bearer" ? ["authorization", `Bearer ${key}`] : [style, key]);
+// A style is "bearer", a header name ("x-token"), or "header:Scheme" ("authorization:Token") for a prefixed value.
+const AUTH_CUSTOM = /^[a-z0-9-]{1,64}(:[\w.-]{1,32})?$/i;
+const NOT_AUTH = /^(host|content-length|content-type|transfer-encoding|connection|accept|accept-encoding|anthropic-version|cookie|origin|referer|cf-|x-forwarded-|x-real-ip)/i;
+const validAuth = (s) => AUTH_STYLES.includes(s) || (typeof s === "string" && AUTH_CUSTOM.test(s) && !NOT_AUTH.test(s));
+function authHeader(style = "bearer", key) {
+  if (style === "bearer") return ["authorization", `Bearer ${key}`];
+  const [name, scheme] = style.split(":");
+  return [name, scheme ? `${scheme} ${key}` : key];
+}
 
 // Returns { bits, n } for an IPv4 or IPv6 address, or null when the text is not one.
 export function parseIp(s) {
@@ -502,7 +510,7 @@ function settings(s) {
   const { expires, auth = "bearer", label = "", models = [], ips = [], period = "total", hours = null, downgrade = null } = s;
   const exp = Date.parse(expires);
   if (!(exp > Date.now() + 60e3)) return { error: "expiry must be at least a minute away" };
-  if (!AUTH_STYLES.includes(auth)) return { error: `auth must be one of ${AUTH_STYLES.join(", ")}` };
+  if (!validAuth(auth)) return { error: `auth must be one of ${AUTH_STYLES.join(", ")}, a header name, or header:Scheme` };
   if (period !== "total" && period !== "month") return { error: "cap period must be total or month" };
   const names = (list, max) => Array.isArray(list) && list.length <= max && list.every((m) => typeof m === "string" && m && m.length <= 200);
   if (!names(models, 500)) return { error: "models must be a list of up to 500 model names" };
@@ -788,7 +796,7 @@ async function admin(req, env, url) {
   if (path === "/admin/models" && req.method === "POST" && body) {
     const stored = KEY_ID.test(body.id || "") ? await env.KEYS.get(body.id, "json") : null;
     const route = body.key ? body : stored && { ...stored, key: await unseal(env, body.id, stored.key), ...(body.base && { base: body.base }), ...(body.auth && { auth: body.auth }) };
-    if (!route?.key || !validBase(route.base)) return json(400, "need an https endpoint and an API key");
+    if (!route?.key || !validBase(route.base) || !validAuth(route.auth ?? "bearer")) return json(400, "need an https endpoint, an API key and a valid auth style");
     const base = route.base.replace(/\/+$/, "");
     const anthropic = route.auth === "x-api-key";
     const headers = new Headers([authHeader(route.auth, route.key)]);

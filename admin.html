@@ -87,12 +87,14 @@
       </div>
       <div>
         <label for="auth">Send real key as</label>
-        <select id="auth">
+        <input id="auth" list="authStyles" value="bearer" autocomplete="off" spellcheck="false" placeholder="bearer, a header name, or header:Scheme" />
+        <datalist id="authStyles">
           <option value="bearer">Authorization: Bearer</option>
           <option value="x-api-key">x-api-key (Anthropic)</option>
           <option value="api-key">api-key (Azure)</option>
           <option value="x-goog-api-key">x-goog-api-key (Gemini)</option>
-        </select>
+          <option value="authorization:Token">Authorization: Token</option>
+        </datalist>
       </div>
     </div>
     <label for="base">Endpoint (provider base URL)</label>

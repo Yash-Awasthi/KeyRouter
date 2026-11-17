@@ -1,0 +1,23 @@
+version: 2
+updates:
+  # Biome, TypeScript and wrangler. One grouped PR a week, so the pins stay current without a stream of noise.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  # The actions in .github/workflows. Monthly: they change rarely and a bump restarts nothing.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci

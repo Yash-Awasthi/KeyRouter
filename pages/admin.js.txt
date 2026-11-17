@@ -1,0 +1,739 @@
+// The admin page's script, served as /admin/admin.js. No inline code, so the page needs no nonce.
+  const $ = (id) => document.getElementById(id);
+  const endpoint = location.origin + "/v1";
+  const pad = (n) => String(n).padStart(2, "0");
+  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const thisMonth = () => new Date().toISOString().slice(0, 7);
+  const usd = (n) => "$" + n.toFixed(n && n < 0.01 ? 6 : 4);
+  const el = (tag, props = {}, ...kids) => {
+    const node = Object.assign(document.createElement(tag), props);
+    node.append(...kids);
+    return node;
+  };
+
+  const PRESETS = [
+    ["Anthropic", "https://api.anthropic.com/v1", "x-api-key"],
+    ["OpenAI", "https://api.openai.com/v1", "bearer"],
+    ["Google Gemini (OpenAI-compatible)", "https://generativelanguage.googleapis.com/v1beta/openai", "bearer"],
+    ["DeepSeek", "https://api.deepseek.com", "bearer"],
+    ["xAI", "https://api.x.ai/v1", "bearer"],
+    ["Mistral", "https://api.mistral.ai/v1", "bearer"],
+    ["Groq", "https://api.groq.com/openai/v1", "bearer"],
+    ["Cerebras", "https://api.cerebras.ai/v1", "bearer"],
+    ["Together AI", "https://api.together.xyz/v1", "bearer"],
+    ["Fireworks AI", "https://api.fireworks.ai/inference/v1", "bearer"],
+    ["Moonshot (Kimi)", "https://api.moonshot.ai/v1", "bearer"],
+    ["Zhipu (GLM)", "https://open.bigmodel.cn/api/paas/v4", "bearer"],
+    ["Alibaba Qwen (DashScope international)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "bearer"],
+    ["Cohere (OpenAI-compatible)", "https://api.cohere.ai/compatibility/v1", "bearer"],
+    ["OpenRouter", "https://openrouter.ai/api/v1", "bearer"],
+  ];
+  $("provider").append(el("option", { value: "", textContent: "Custom endpoint" }), ...PRESETS.map(([name], i) => el("option", { value: i, textContent: name })));
+  $("provider").onchange = () => {
+    const p = PRESETS[$("provider").value];
+    if (p) [$("base").value, $("auth").value] = [p[1], p[2]];
+  };
+  const hostAuth = { "api.anthropic.com": "x-api-key", "generativelanguage.googleapis.com": "bearer" };
+  $("base").oninput = () => {
+    const base = $("base").value.trim().replace(/\/+$/, "");
+    const i = PRESETS.findIndex((p) => p[1] === base);
+    $("provider").value = i < 0 ? "" : i;
+    let host = "";
+    try { host = new URL(base).hostname; } catch {}
+    const style = hostAuth[host] || (host.endsWith(".openai.azure.com") ? "api-key" : null);
+    if (style) $("auth").value = style;
+  };
+
+  async function send(path, method, body) {
+    const res = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body && JSON.stringify(body) });
+    const data = await res.json().catch(() => ({ error: { message: `request failed (${res.status})` } }));
+    if (!res.ok) throw new Error(data.error?.message || `request failed (${res.status})`);
+    return data;
+  }
+
+  // Model picker: checked names are allowed exactly; an empty selection with no patterns allows every model.
+  const selected = new Set();
+  let available = [];
+  function renderModels() {
+    const q = $("modelFilter").value.trim().toLowerCase();
+    const names = [...new Set([...available, ...selected])].sort();
+    $("modelList").hidden = !names.length;
+    $("modelList").replaceChildren(...names.filter((n) => n.toLowerCase().includes(q)).map((n) => {
+      const box = el("input", { type: "checkbox", checked: selected.has(n) });
+      box.onchange = () => { box.checked ? selected.add(n) : selected.delete(n); renderModels(); };
+      return el("label", {}, box, n);
+    }));
+    $("modelCount").textContent = selected.size
+      ? `${selected.size} model${selected.size > 1 ? "s" : ""} selected; requests for other models are refused.`
+      : "No models selected: every model is allowed unless a pattern is set.";
+  }
+  const shownModels = () => [...$("modelList").querySelectorAll("label")].map((l) => l.textContent);
+  $("modelFilter").oninput = renderModels;
+  $("selectShown").onclick = () => { shownModels().forEach((n) => selected.add(n)); renderModels(); };
+  $("clearModels").onclick = () => { selected.clear(); renderModels(); };
+  $("loadModels").onclick = async () => {
+    $("modelErr").textContent = "";
+    const key = $("key").value.trim();
+    const body = { base: $("base").value.trim(), auth: $("auth").value };
+    if (key) body.key = key;
+    else if (editing || copying) body.id = (editing || copying).id;
+    $("loadModels").disabled = true;
+    try {
+      available = (await send("/admin/models", "POST", body)).models;
+      if (!available.length) $("modelErr").textContent = "The provider returned no models; add names under Extra patterns.";
+    } catch (e) {
+      $("modelErr").textContent = e.message + ". You can still type model names under Extra patterns.";
+    }
+    $("loadModels").disabled = false;
+    renderModels();
+  };
+
+  let editing = null;
+  let copying = null;
+  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  $("days").append(...DAY_NAMES.map((d, i) => el("label", {}, el("input", { type: "checkbox", value: i }), d)));
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  $("zones").append(...(Intl.supportedValuesOf?.("timeZone") || []).map((z) => el("option", { value: z })));
+  let keys = [];
+  const NUMBERS = ["capUsd", "capTokens", "rpm", "maxOutput", "alertAt"];
+  function resetForm() {
+    editing = copying = null;
+    $("form").reset();
+    $("expires").value = local(new Date(Date.now() + 864e5));
+    $("key").required = true;
+    $("key").placeholder = "";
+    $("formTitle").textContent = "New key";
+    $("submit").textContent = "Create key";
+    $("cancel").hidden = true;
+    $("countRow").hidden = false;
+    $("tz").value = browserZone;
+    $("batch").style.display = "none";
+    selected.clear();
+    available = [];
+    renderModels();
+  }
+  // Fills the form from a key, to edit it or to create a copy that reuses its real key.
+  function editKey(k, copy) {
+    resetForm();
+    if (copy) copying = k;
+    else editing = k;
+    $("base").value = k.base;
+    $("base").oninput();
+    $("auth").value = k.auth || "bearer";
+    $("key").required = false;
+    $("key").placeholder = copy ? "leave empty to reuse the copied key's real key" : "leave empty to keep the current key";
+    if (!copy) $("expires").value = local(new Date(k.expires));
+    $("label").value = k.label || "";
+    for (const f of NUMBERS) $(f).value = k[f] ?? "";
+    $("headerOnly").checked = !!k.headerOnly;
+    $("period").value = k.period || "total";
+    $("ips").value = (k.ips || []).join(", ");
+    $("downAt").value = k.downgrade?.at ?? "";
+    $("downMap").value = (k.downgrade?.map || []).map(([a, b]) => `${a} => ${b}`).join("\n");
+    for (const box of $("days").querySelectorAll("input")) box.checked = !!k.hours?.days.includes(Number(box.value));
+    if (k.hours) [$("start").value, $("end").value, $("tz").value] = [k.hours.start, k.hours.end, k.hours.tz];
+    $("countRow").hidden = !copy;
+    for (const m of k.models || []) if (!m.endsWith("*")) selected.add(m);
+    $("patterns").value = (k.models || []).filter((m) => m.endsWith("*")).join(", ");
+    $("formTitle").textContent = (copy ? "New key, copied from " : "Edit ") + (k.label || k.id);
+    $("submit").textContent = copy ? "Create key" : "Save changes";
+    $("cancel").hidden = false;
+    $("result").style.display = "none";
+    renderModels();
+    $("form").scrollIntoView({ behavior: "smooth" });
+  }
+  $("cancel").onclick = resetForm;
+
+  $("form").onsubmit = async (e) => {
+    e.preventDefault();
+    $("err").textContent = $("msg").textContent = "";
+    const list = (id, sep) => $(id).value.split(sep).map((s) => s.trim()).filter(Boolean);
+    const payload = {
+      base: $("base").value.trim(),
+      auth: $("auth").value,
+      label: $("label").value.trim(),
+      period: $("period").value,
+      ips: list("ips", /[\s,]+/),
+      models: [...selected, ...list("patterns", ",")],
+    };
+    const days = [...$("days").querySelectorAll("input:checked")].map((b) => Number(b.value));
+    payload.hours = days.length ? { days, start: $("start").value, end: $("end").value, tz: $("tz").value.trim() } : null;
+    const rules = $("downMap").value.split("\n").map((l) => l.split("=>").map((x) => x.trim())).filter((p) => p[0]);
+    if (rules.some((p) => p.length !== 2 || !p[1])) return ($("err").textContent = "Write each downgrade rule as: requested model => cheaper model");
+    payload.downgrade = $("downAt").value || rules.length ? { at: Number($("downAt").value), map: rules } : null;
+    if (!editing) payload.count = Number($("count").value) || 1;
+    for (const f of NUMBERS) payload[f] = $(f).value === "" ? null : Number($(f).value);
+    payload.headerOnly = $("headerOnly").checked;
+    if ($("key").value.trim()) payload.key = $("key").value.trim();
+    else if (copying) payload.from = copying.id;
+    let data;
+    try {
+      payload.expires = new Date($("expires").value).toISOString();
+      data = await send(editing ? "/admin/keys/" + editing.id : "/admin/keys", editing ? "PATCH" : "POST", payload);
+    } catch (err) {
+      return ($("err").textContent = err.message === "Invalid time value" ? "Pick an expiry date and time." : err.message);
+    }
+    if (editing) {
+      resetForm();
+      $("msg").textContent = "Saved changes to " + (data.label || data.id) + ".";
+    } else if (data.keys) {
+      batchKeys = data.keys;
+      $("result").style.display = "none";
+      $("batchText").textContent = `Created ${data.keys.length} keys. Download them now; the list below shows them too.`;
+      $("batch").style.display = "block";
+      $("key").value = "";
+    } else {
+      $("outBase").textContent = endpoint;
+      $("outKey").textContent = data.id;
+      $("outSettings").textContent = JSON.stringify({
+        env: { ANTHROPIC_API_KEY: data.id, ANTHROPIC_BASE_URL: location.origin, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
+        permissions: { allow: [], deny: [] },
+      }, null, 2);
+      $("result").style.display = "block";
+      $("key").value = "";
+    }
+    load();
+  };
+
+  const sumOf = (bucket) => Object.values(bucket || {}).reduce((s, m) => s + (m.cost || 0), 0);
+  // The compact cell: one line per key, so a page of 20 stays a page. The detail is a table that opens in place.
+  function usage(u) {
+    const models = Object.keys(u?.total || {}).length;
+    if (!models) return "none";
+    const month = u.months?.[thisMonth()] || {};
+    const reqs = Object.values(month).reduce((s, m) => s + m.requests, 0);
+    return `${usd(sumOf(u.total))} lifetime, ${usd(sumOf(month))} this month (${reqs} req, ${models} model${models === 1 ? "" : "s"})`;
+  }
+
+  const modelRow = ([model, m]) => el("tr", {},
+    el("td", { "data-label": "Model", textContent: model }),
+    el("td", { className: "num", "data-label": "Requests", textContent: m.requests.toLocaleString() }),
+    el("td", { className: "num", "data-label": "Input", textContent: m.input.toLocaleString() }),
+    el("td", { className: "num", "data-label": "Output", textContent: m.output.toLocaleString() }),
+    el("td", { className: "num", "data-label": "Cost", textContent: m.priced ? usd(m.cost) : "unpriced" }),
+  );
+
+  // The usage table: 20 models at a time, with a real count so nobody has to guess what is hidden.
+  const MODELS_PER_PAGE = 20;
+  function usageTable(k) {
+    const rows = Object.entries(k.usage?.total || {}).sort((a, b) => (b[1].cost || 0) - (a[1].cost || 0));
+    const body = el("tbody", {});
+    const count = el("span", { className: "muted" });
+    const more = el("button", { type: "button", className: "secondary small", textContent: "Show 20 more" });
+    let shown = 0;
+    const draw = () => {
+      const next = rows.slice(shown, shown + MODELS_PER_PAGE);
+      shown += next.length;
+      body.append(...next.map(modelRow));
+      count.textContent = `${shown} of ${rows.length} model${rows.length === 1 ? "" : "s"}, ${usd(sumOf(k.usage?.total))} lifetime`;
+      more.hidden = shown >= rows.length;
+    };
+    more.onclick = draw;
+    draw();
+    return el("div", { className: "usageDetail" },
+      el("div", { className: "head" }, count, more),
+      el("table", {}, el("thead", {}, el("tr", {},
+        el("th", { textContent: "Model" }), el("th", { className: "num", textContent: "Requests" }),
+        el("th", { className: "num", textContent: "Input" }), el("th", { className: "num", textContent: "Output" }),
+        el("th", { className: "num", textContent: "Cost" }),
+      )), body),
+    );
+  }
+
+  // A row opens one detail row beneath it; clicking again closes it, so the table never stacks up panels.
+  function toggleUsage(k, row) {
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains("detail")) return next.remove();
+    document.querySelectorAll("#list tr.detail").forEach((r) => r.remove());
+    const cell = el("td", { colSpan: 6 });
+    const models = Object.keys(k.usage?.total || {}).length;
+    cell.append(models ? usageTable(k) : el("p", { className: "muted", textContent: "No usage recorded for this key yet." }));
+    row.after(el("tr", { className: "detail" }, cell));
+  }
+
+
+  let cursor = null;
+  // The search and the state filter are answered by the worker (it can see every key); the cap filter is applied
+  // to the page in hand, because it needs each key's usage and that costs one meter request per key.
+  const filterParams = () => {
+    const params = new URLSearchParams();
+    const q = $("q").value.trim();
+    if (q) params.set("q", q);
+    if ($("state").value !== "all") params.set("state", $("state").value);
+    return params;
+  };
+  const syncUrl = () => {
+    const params = filterParams();
+    const next = location.pathname + (params.toString() ? "?" + params : "");
+    if (location.pathname + location.search !== next) history.replaceState(null, "", next);
+  };
+  const fetchKeys = async (from) => {
+    const params = filterParams();
+    if (from) params.set("cursor", from);
+    return (await fetch("/admin/keys" + (params.toString() ? "?" + params : ""))).json();
+  };
+  const spent = (k) => {
+    const bucket = k.period === "month" ? k.usage?.months?.[thisMonth()] : k.usage?.total;
+    return Object.values(bucket || {}).reduce((s, m) => s + (m.cost || 0), 0);
+  };
+  const nearCap = (k) => {
+    if (!$("nearCap").checked) return true;
+    const cap = Number(k.capUsd);
+    return cap > 0 && spent(k) >= cap * 0.8;
+  };
+  const full = async (k) => {
+    const res = await fetch("/admin/keys/" + k.id);
+    return res.ok ? res.json() : Promise.reject(new Error("could not load " + k.id));
+  };
+  async function load(more) {
+    if (!more) {
+      keys = [];
+      $("list").replaceChildren();
+    }
+    syncUrl();
+    const page = await fetchKeys(more ? cursor : null);
+    cursor = page.cursor;
+    const shown = page.keys.filter(nearCap);
+    const total = typeof page.total === "number" ? page.total : page.keys.length;
+    const capped = $("nearCap").checked ? ", at 80%+ of a cap on this page" : "";
+    const partial = page.truncated ? " (first 1,000 checked)" : "";
+    $("count").textContent = `${shown.length} of ${total} key${total === 1 ? "" : "s"}${partial}${capped}`;
+    $("more").hidden = !cursor;
+    keys.push(...shown);
+    const filtered = filterParams().toString();
+    if (!keys.length) $("list").replaceChildren(el("tr", {}, el("td", { colSpan: 6, className: "empty", textContent: filtered ? "No key matches that filter" : "No keys" })));
+    for (const k of shown) $("list").append(keyRow(k));
+  }
+  $("more").onclick = () => load(true);
+  // Typing filters as you go; the URL follows, so a filtered view can be reloaded or shared.
+  let typing = null;
+  $("q").oninput = () => {
+    clearTimeout(typing);
+    typing = setTimeout(() => load(), 200);
+  };
+  $("state").onchange = () => load();
+  $("nearCap").onchange = () => load();
+  // Keyboard: "/" jumps to the search, "n" to a new key, Escape leaves the form and puts focus back on the list.
+  // A shortcut must never fire while a field has focus, or typing a label would open forms mid-word.
+  const inField = (target) => ["input", "textarea", "select"].includes((target.tagName || "").toLowerCase()) || target.isContentEditable;
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (document.activeElement === $("q")) return $("q").blur();
+      // Escape cancels an edit before it touches a clean form, so it can never clear a half-typed key.
+      if (!editing && !inField(event.target)) return;
+      resetForm();
+      $("formTitle").focus?.();
+      return;
+    }
+    if (inField(event.target) || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "/") {
+      event.preventDefault();
+      $("q").focus();
+      $("q").select();
+    } else if (event.key === "n" || event.key === "N") {
+      event.preventDefault();
+      resetForm();
+      $("label").focus();
+      $("label").scrollIntoView({ block: "center" });
+    }
+  });
+  // Start from the URL, so ?q=anthropic&state=active is a working bookmark.
+  const urlState = new URLSearchParams(location.search);
+  $("q").value = urlState.get("q") || "";
+  $("state").value = urlState.get("state") || "all";
+  const action = (text, onclick, danger) => [el("button", { className: danger ? "ghost" : "ghost plain", textContent: text, onclick }), el("br")];
+  function keyRow(k) {
+    const id = el("td", { className: "id", "data-label": "Key" }, ...(k.label ? [el("strong", { textContent: k.label, style: "font-family: system-ui, sans-serif" }), el("br")] : []), k.id);
+    const exp = el("td", { "data-label": "Expires", textContent: new Date(k.expires).toLocaleString() });
+    if (!k.active) exp.append(el("div", { className: "tag", textContent: "expired" }));
+    const actions = el("td", { "data-label": "Actions" });
+    if (k.active && !viewerMode) {
+      actions.append(
+        ...action("Edit", async () => editKey(await full(k))),
+        ...action("Duplicate", async () => editKey(await full(k), true)),
+        ...action("Share link", async () => {
+          try {
+            const { url, expires } = await send(`/admin/keys/${k.id}/share`, "POST", {});
+            prompt(`One-time link for ${k.label || k.id}. It shows the key once and stops working after ${new Date(expires).toLocaleString()}.`, url);
+          } catch (e) {
+            alert(e.message);
+          }
+        }),
+        ...action("Reset usage", async () => {
+          if (!confirm("Reset the usage totals of " + (k.label || k.id) + "? Its caps start counting from zero.")) return;
+          await fetch(`/admin/keys/${k.id}/usage`, { method: "DELETE" });
+          load();
+        }),
+      );
+    }
+    actions.append(el("button", {
+      className: "ghost",
+      textContent: k.active ? "Revoke" : "Delete",
+      title: k.active ? "Stop the key everywhere and keep its spend on record" : "Remove the record and its usage",
+      onclick: async () => {
+        if (!confirm((k.active ? "Revoke " : "Delete ") + (k.label || k.id) + "? Calls already in flight can finish, and other Cloudflare locations can honour a stale copy for up to a minute.")) return;
+        if (k.active) await fetch(`/admin/keys/${k.id}/revoke`, { method: "POST" });
+        else await fetch("/admin/keys/" + k.id, { method: "DELETE" });
+        if (editing?.id === k.id) resetForm();
+        load();
+      },
+    }));
+    const usageCell = el("td", { className: "usage", "data-label": "Usage" }, el("div", { textContent: usage(k.usage) }));
+    const row = el("tr", {}, id, el("td", { "data-label": "Forwards to", textContent: k.base }), exp,
+      el("td", { className: "multi", "data-label": "Limits", textContent: k.limits || "" }), usageCell, actions);
+    if (Object.keys(k.usage?.total || {}).length) {
+      usageCell.append(el("button", { type: "button", className: "ghost plain", textContent: "By model", onclick: () => toggleUsage(k, row) }));
+    }
+    return row;
+  }
+
+  // The audit log: 20 rows at a time, newest first, and a real count so the button means something.
+  const AUDIT_PER_PAGE = 20;
+  let audit = [];
+  let auditKept = 0;
+  const auditRow = (e) => el("tr", {},
+    el("td", { "data-label": "When", textContent: new Date(e.at).toLocaleString() }),
+    el("td", { "data-label": "Who", textContent: e.role }),
+    el("td", { "data-label": "What", textContent: e.action }),
+    el("td", { "data-label": "Which", className: "id", textContent: e.target || "" }),
+  );
+  async function loadAudit(more) {
+    if (!more) audit = [];
+    const page = await (await fetch("/admin/audit?limit=" + AUDIT_PER_PAGE + (more ? "&skip=" + audit.length : ""))).json();
+    auditKept = page.kept;
+    audit.push(...page.entries);
+    $("audit").replaceChildren(...audit.map(auditRow));
+    if (!audit.length) $("audit").replaceChildren(el("tr", {}, el("td", { colSpan: 4, className: "empty", textContent: "Nothing recorded yet" })));
+    $("moreAudit").hidden = audit.length >= auditKept;
+    $("moreAudit").textContent = `Show ${Math.min(AUDIT_PER_PAGE, auditKept - audit.length)} more of ${auditKept}`;
+  }
+  $("moreAudit").onclick = () => loadAudit(true);
+
+  // Invites: the only way a second person gets in, and the only role they can get is viewer.
+  async function loadInvites() {
+    const list = await (await fetch("/admin/invites")).json();
+    $("invites").replaceChildren(...list.map((i) => el("li", {},
+      el("span", { textContent: i.label || "(no name)" }),
+      el("code", { textContent: "/join?code=" + i.code.slice(0, 6) + "..." }),
+      el("span", { textContent: "expires " + new Date(i.expires).toLocaleString() }),
+      el("button", {
+        type: "button", className: "ghost", textContent: "Cancel",
+        onclick: async () => {
+          await fetch("/admin/invites/" + i.code, { method: "DELETE" });
+          loadInvites();
+        },
+      }),
+    )));
+    if (!list.length) $("invites").replaceChildren(el("li", { className: "empty", textContent: "No pending invites" }));
+  }
+  $("inviteForm").onsubmit = async (e) => {
+    e.preventDefault();
+    $("inviteErr").hidden = true;
+    const res = await fetch("/admin/invites", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label: $("inviteLabel").value.trim() }) });
+    if (!res.ok) {
+      $("inviteErr").textContent = (await res.json().catch(() => ({ error: { message: "could not create an invite" } }))).error.message;
+      $("inviteErr").hidden = false;
+      return;
+    }
+    const invite = await res.json();
+    // Shown once, on the page that asked for it: the code is the secret, and the list only shows its first characters.
+    $("inviteLink").textContent = "Send this link: " + invite.url;
+    $("inviteLink").hidden = false;
+    $("inviteLabel").value = "";
+    loadInvites();
+  };
+
+  // Host budgets: one cap per provider host, shared by every key pointed at it.
+  async function loadGroups() {
+    const { groups } = await (await fetch("/admin/groups")).json();
+    $("groups").replaceChildren(...groups.map((g) => {
+      const usage = g.usage && typeof g.usage.spent_usd === "number" ? g.usage.spent_usd : 0;
+      const share = g.capUsd ? Math.min(100, Math.round((usage / g.capUsd) * 100)) : 0;
+      return el("li", {},
+        el("code", { textContent: g.host }),
+        el("span", { textContent: `${usage.toFixed(2)} of ${g.capUsd} (${share}%)` }),
+        el("button", {
+          type: "button", className: "ghost", textContent: "Clear",
+          onclick: async () => { await saveGroup(g.host, 0); },
+        }),
+      );
+    }));
+    if (!groups.length) $("groups").replaceChildren(el("li", { className: "empty", textContent: "No host budget yet" }));
+  }
+  async function saveGroup(host, capUsd) {
+    $("groupErr").hidden = true;
+    const res = await fetch("/admin/groups", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ host, capUsd }) });
+    if (!res.ok) {
+      const answer = await res.json().catch(() => ({ error: "could not save the budget" }));
+      $("groupErr").textContent = answer.error || "could not save the budget";
+      $("groupErr").hidden = false;
+      return false;
+    }
+    await loadGroups();
+    return true;
+  }
+  $("groupForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const ok = await saveGroup($("groupHost").value.trim(), Number($("groupCap").value));
+    if (ok) {
+      $("groupHost").value = "";
+      $("groupCap").value = "";
+    }
+  };
+
+  // The whole deployment's report: totals, the models that cost the most, and which keys look unusual.
+  async function loadReport() {
+    const days = $("reportDays").value;
+    const report = await (await fetch("/admin/report?days=" + days)).json();
+    const money = (n) => "$" + Number(n).toFixed(n && n < 0.01 ? 6 : 2);
+    $("reportTotals").replaceChildren(
+      el("span", { textContent: `${report.keys} keys, ${report.totals.requests} requests` }),
+      el("span", { textContent: money(report.totals.spend_usd) }),
+      el("span", { textContent: `${report.totals.tokens.toLocaleString()} tokens` }),
+      el("span", { textContent: `${report.totals.refused} refused, ${report.totals.downgraded} rerouted` }),
+    );
+    $("reportModels").replaceChildren(...report.top.map((m) => el("tr", {},
+      el("td", { "data-label": "Model", textContent: m.model }),
+      el("td", { "data-label": "Requests", textContent: m.requests.toLocaleString() }),
+      el("td", { "data-label": "Input", textContent: m.input.toLocaleString() }),
+      el("td", { "data-label": "Output", textContent: m.output.toLocaleString() }),
+      el("td", { "data-label": "Cost", textContent: money(m.cost) + (m.priced ? "" : " unpriced") }),
+    )));
+    if (!report.top.length) $("reportModels").replaceChildren(el("tr", {}, el("td", { colSpan: 5, className: "empty", textContent: "Nothing spent in this window" })));
+    // Say what the numbers do not cover, rather than quietly reporting a partial total.
+    $("reportNote").textContent = report.truncated
+      ? `Only the first ${report.scanned} keys are counted, so these totals are a floor.`
+      : report.anomalies.length
+        ? "Unusual hours: " + report.anomalies.map((a) => `${a.label || a.id.slice(0, 12) + "..."} at ${a.ratio}x`).join(", ")
+        : "";
+  }
+  $("reportDays").onchange = () => loadReport();
+
+  // Rotation requests: the holder asks, the owner approves here and hands the new key over with a share link.
+  // The live tail: a read-only view of the last 50 calls, and it polls while the page is open because that is what a
+  // tail is for. Off unless REQUEST_LOG is true, so most deployments never see the card.
+  const LOG_EVERY = 5000;
+  async function loadLog() {
+    const log = await (await fetch("/admin/log?limit=50")).json();
+    $("logCard").hidden = !log.enabled;
+    if (!log.enabled) return;
+    const row = (e) => el("tr", {}, ...["at", "key", "model", "status", "tokens", "ms"].map((f) => {
+      const cell = el("td", { "data-label": f }, f === "at" ? new Date(e.at).toLocaleTimeString() : String(e[f] ?? "—"));
+      return cell;
+    }));
+    $("logRows").replaceChildren(...(log.entries || []).map(row));
+    $("logNote").textContent = log.entries?.length ? `${log.entries.length} of ${log.kept} kept` : "nothing yet";
+  }
+
+  // A provider that has stopped answering is worth one line at the top of the page, not a hunt through the audit log.
+  async function loadHealth() {
+    const health = await (await fetch("/admin/health")).json();
+    const down = health.down || [];
+    $("healthBanner").hidden = !down.length;
+    if (down.length) $("healthText").textContent = down.join(", ");
+  }
+
+  async function loadRotations() {
+    const page = await (await fetch("/admin/rotations")).json();
+    $("rotationsCard").hidden = !page.pending;
+    $("rotateCount").textContent = page.pending ? `${page.pending} waiting` : "";
+    $("rotations").replaceChildren(...page.rotations.map((r) => {
+      const options = { type: "button", className: "secondary small", textContent: "Approve" };
+      const yes = el("button", options);
+      const no = el("button", { type: "button", className: "ghost small", textContent: "Deny" });
+      const act = async (what) => {
+        yes.disabled = no.disabled = true;
+        const res = await fetch(`/admin/rotations/${r.id}/${what}`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) { yes.disabled = no.disabled = false; return $("rotateCount").textContent = data.error.message; }
+        if (what === "approve") {
+          // The new key is shown once, by link, never in this page's own body.
+          const line = el("span", { className: "muted", textContent: `New key ready. Old key stops ${new Date(data.old.expires).toLocaleString()}. ` });
+          const link = el("a", { href: data.url, target: "_blank", rel: "noopener noreferrer", textContent: "Open the new key" });
+          r.node.replaceChildren(line, link);
+        }
+        await Promise.all([loadRotations(), loadAudit(), load()]);
+      };
+      yes.onclick = () => act("approve");
+      no.onclick = () => act("deny");
+      const node = el("li", {},
+        el("span", {}, el("code", { textContent: r.id.slice(0, 12) + "..." }), " ", el("span", { className: "muted", textContent: r.label || "unlabelled" }), " ", el("span", { className: "muted", textContent: new Date(r.at).toLocaleString() })),
+        el("span", {}, yes, " ", no));
+      return Object.assign(node, { node });
+    }));
+  }
+
+  let batchKeys = [];
+  const download = (name, rows) => {
+    const a = el("a", { href: URL.createObjectURL(new Blob([rows.map((r) => r.map(cell).join(",")).join("\n") + "\n"], { type: "text/csv" })), download: name });
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $("batchCsv").onclick = () => download("key-router-keys.csv", [["label", "key", "endpoint", "expires"], ...batchKeys.map((k) => [k.label, k.id, endpoint, k.expires])]);
+
+  // Cells starting with = + - @ are prefixed so spreadsheets do not run them as formulas.
+  const cell = (v) => {
+    let s = String(v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+  };
+  $("export").onclick = async () => {
+    const all = [];
+    let from = null;
+    do {
+      const page = await fetchKeys(from);
+      all.push(...page.keys);
+      from = page.cursor;
+    } while (from);
+    const rows = [["key", "label", "month", "model", "requests", "input_tokens", "output_tokens", "cost_usd", "priced"]];
+    for (const k of all) {
+      for (const [month, models] of Object.entries(k.usage.months || {}).sort()) {
+        for (const [model, u] of Object.entries(models)) rows.push([k.id, k.label || "", month, model, u.requests, u.input, u.output, u.cost.toFixed(6), u.priced]);
+      }
+      // Usage recorded before monthly tracking existed only has lifetime totals.
+      for (const [model, t] of Object.entries(k.usage.total || {})) {
+        const seen = Object.values(k.usage.months || {}).map((m) => m[model]).filter(Boolean);
+        const less = (f) => t[f] - seen.reduce((s, m) => s + m[f], 0);
+        if (less("requests") > 0) rows.push([k.id, k.label || "", "before monthly tracking", model, less("requests"), less("input"), less("output"), less("cost").toFixed(6), t.priced]);
+      }
+    }
+    download(`key-router-usage-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  };
+
+  const PRICE_COLS = ["match", "in", "out", "read", "write5m", "write1h", "longAbove", "longScale", "fast"];
+  const PRICE_NAMES = ["Model name contains", "Input", "Output", "Cache read", "5m write", "1h write", "Long above", "Long multiplier", "Fast multiplier"];
+  let defaults = [];
+  function renderPrices(rows) {
+    $("prices").tBodies[0].replaceChildren(...rows.map((r) => {
+      const tr = el("tr", {}, ...PRICE_COLS.map((c, i) => {
+        const input = el("input", { value: r[c] ?? "", type: i ? "number" : "text", min: 0, step: "any", required: i < 6 });
+        input.setAttribute("aria-label", PRICE_NAMES[i]);
+        input.dataset.col = c;
+        return el("td", {}, input);
+      }));
+      tr.append(el("td", {}, el("button", { type: "button", className: "ghost", textContent: "Remove", onclick: () => tr.remove() })));
+      return tr;
+    }));
+  }
+  const readPrices = () => [...$("prices").tBodies[0].rows].map((tr) =>
+    Object.fromEntries([...tr.querySelectorAll("input")].map((i) => [i.dataset.col, i.dataset.col === "match" ? i.value : i.value === "" ? null : Number(i.value)])));
+  const filterPrices = () => {
+    const q = $("priceFilter").value.trim().toLowerCase();
+    for (const tr of $("prices").tBodies[0].rows) tr.hidden = !!q && !tr.querySelector("input").value.toLowerCase().includes(q);
+  };
+  $("priceFilter").oninput = filterPrices;
+  $("addPrice").onclick = () => {
+    $("priceFilter").value = "";
+    renderPrices([...readPrices(), { match: "" }]);
+    $("prices").tBodies[0].lastElementChild.querySelector("input").focus();
+  };
+  $("resetPrices").onclick = () => renderPrices(structuredClone(defaults));
+  $("importOpenRouter").onclick = async () => {
+    $("priceErr").textContent = $("priceMsg").textContent = "";
+    try {
+      const imported = (await send("/admin/prices/openrouter", "GET")).prices;
+      const names = new Set(imported.map((r) => r.match));
+      renderPrices([...readPrices().filter((r) => !names.has(r.match)), ...imported]);
+      filterPrices();
+      $("priceMsg").textContent = `Added or updated ${imported.length} OpenRouter models. Review them, then save. OpenRouter's own reported cost is used for its requests when available.`;
+    } catch (e) {
+      $("priceErr").textContent = e.message;
+    }
+  };
+  $("savePrices").onclick = async () => {
+    $("priceErr").textContent = $("priceMsg").textContent = "";
+    try {
+      renderPrices((await send("/admin/prices", "PUT", { prices: readPrices() })).prices);
+      $("priceMsg").textContent = "Prices saved.";
+    } catch (e) {
+      $("priceErr").textContent = e.message;
+    }
+  };
+  (async () => {
+    const data = await (await fetch("/admin/prices")).json();
+    defaults = data.defaults;
+    renderPrices(data.prices);
+  })();
+
+  // A viewer gets the same page with the writing controls removed: a button that only answers 403 is a trap.
+  let viewerMode = false;
+  async function loadAuth() {
+    const status = await (await fetch("/admin/status")).json();
+    viewerMode = status.role === "viewer";
+    document.body.classList.toggle("viewer", viewerMode);
+    $("viewerNote").hidden = !viewerMode;
+    // A viewer may read keys but not the passkey list, so the sign-in card is left to the owner entirely.
+    if (viewerMode) {
+      $("passkeys").replaceChildren(el("li", { className: "muted", textContent: "Only an owner can see or change passkeys." }));
+      load();
+      return;
+    }
+    $("plaintext").hidden = status.encrypted;
+    $("passkeyWarning").hidden = status.passkeys > 0 || status.passwordFallback;
+    $("signout").hidden = !status.passkeys;
+    $("authHint").textContent = status.passkeys
+      ? "Passkeys are required to sign in. The admin password no longer works" + (status.passwordFallback ? ", except that ALLOW_PASSWORD is set, so it still does." : ". Keep at least two passkeys so losing one does not lock you out.")
+      : "You sign in with the admin password. Add a passkey to sign in with your fingerprint, face or a security key instead; the password then stops working.";
+    const list = await (await fetch("/admin/passkeys")).json();
+    $("passkeys").replaceChildren(...list.map((p) => el("li", {},
+      el("span", { textContent: `${p.name} (added ${new Date(p.created).toLocaleDateString()})` }),
+      el("button", {
+        className: "ghost",
+        textContent: "Remove",
+        onclick: async () => {
+          if (!confirm(`Remove the passkey "${p.name}"?` + (list.length === 1 ? " The admin password will work again." : ""))) return;
+          await fetch("/admin/passkeys/" + p.id, { method: "DELETE" });
+          loadAuth();
+        },
+      }))));
+  }
+  const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  const unb64u = (s) => Uint8Array.from(atob(s.replaceAll("-", "+").replaceAll("_", "/")), (c) => c.charCodeAt(0));
+  $("addPasskey").onclick = async () => {
+    $("passkeyErr").textContent = "";
+    try {
+      const o = await send("/admin/passkeys/options", "POST", {});
+      const cred = await navigator.credentials.create({ publicKey: {
+        challenge: unb64u(o.challenge),
+        rp: o.rp,
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "admin", displayName: "KeyRouter admin" },
+        pubKeyCredParams: [-7, -8, -257].map((alg) => ({ type: "public-key", alg })),
+        authenticatorSelection: { residentKey: "required", userVerification: "required" },
+        excludeCredentials: o.exclude.map((id) => ({ type: "public-key", id: unb64u(id) })),
+        timeout: 60000,
+      } });
+      const r = cred.response;
+      if (!r.getPublicKey) throw new Error("This browser cannot register passkeys here; try a current Chrome, Edge, Safari or Firefox.");
+      await send("/admin/passkeys", "POST", {
+        id: cred.id,
+        clientDataJSON: b64u(r.clientDataJSON),
+        publicKey: b64u(r.getPublicKey()),
+        alg: r.getPublicKeyAlgorithm(),
+        name: $("passkeyName").value.trim() || "Passkey",
+      });
+      $("passkeyName").value = "";
+      loadAuth();
+    } catch (e) {
+      $("passkeyErr").textContent = e.name === "NotAllowedError" ? "Passkey creation was cancelled or timed out." : e.message;
+    }
+  };
+  $("signout").onclick = async () => {
+    await fetch("/admin/logout", { method: "POST" });
+    location.reload();
+  };
+  loadAuth();
+
+  document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
+    await navigator.clipboard.writeText($(b.dataset.copy).textContent);
+    b.textContent = "copied";
+    setTimeout(() => (b.textContent = "copy"), 1200);
+  }));
+  resetForm();
+  // The mode decides which buttons exist, so the list is built after the status arrives.
+  loadAuth().then(() => {
+    load();
+    loadReport();
+    loadHealth();
+    loadLog().then(() => setInterval(loadLog, LOG_EVERY));
+    if (!viewerMode) loadInvites().then(() => loadGroups()).then(() => loadAudit()).then(() => loadRotations());
+  });

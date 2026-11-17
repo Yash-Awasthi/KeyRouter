@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-gateway",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-17",
+  // The free plan allows 10 ms of CPU per request, and a metered call measures a small fraction of it,
+  // so the ceiling is stated rather than assumed: a call that ever exceeds it fails loudly instead of silently.
+  "limits": { "cpu_ms": 10 },
+  // Logs, request counts and errors in the dashboard, which is the only telemetry a free-plan worker has.
+  "observability": { "enabled": true },
+  // A daily usage digest, posted to ALERT_WEBHOOK at 07:00 UTC. Without that secret the trigger fires and does nothing.
+  "triggers": { "crons": ["0 7 * * *"] },
+  // The admin page's stylesheet and script are imported as text, so the worker can serve them itself. The globs name
+  // exactly those two files and fall through for everything else, so no worker module can be swallowed by the rule.
+  "rules": [{ "type": "Text", "globs": ["pages/*.txt"], "fallthrough": true }],
+  "kv_namespaces": [{ "binding": "KEYS" }],
+  "durable_objects": {
+    "bindings": [
+      { "name": "METER", "class_name": "Meter" },
+      { "name": "ADMIN", "class_name": "Admin" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Meter"] },
+    { "tag": "v2", "new_sqlite_classes": ["Admin"] }
+  ]
+}

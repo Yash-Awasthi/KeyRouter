@@ -1,0 +1,29 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.6.8/schema.json",
+  "formatter": {
+    "enabled": false
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "nursery": {
+        "noFloatingPromises": "error"
+      },
+      "suspicious": {
+        "noAssignInExpressions": "off"
+      }
+    }
+  },
+  "files": {
+    "includes": [
+      "worker.js",
+      "worker.test.js",
+      "bin/**/*.mjs",
+      "scripts/**/*.mjs",
+      "src/**/*.js",
+      "test/**/*.js",
+      "test/**/*.mjs"
+    ]
+  }
+}

@@ -4,65 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KeyRouter</title>
-<style>
-  :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc; --accent: #2f5bea; --danger: #c43c2b; --ok: #2b7a3d; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #151514; --card: #1f1f1d; --text: #ececE8; --muted: #9a9a93; --line: #33332f; --accent: #7d9bff; --danger: #ff7a68; --ok: #6fcf86; }
-  }
-  * { box-sizing: border-box; }
-  [hidden] { display: none !important; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
-  main { max-width: 960px; margin: 0 auto; padding: 32px 16px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 0; }
-  p.sub { color: var(--muted); margin: 0 0 24px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
-  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
-  input, select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
-  input[type=checkbox] { width: auto; margin: 0 6px 0 0; }
-  button { margin-top: 16px; padding: 9px 16px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; white-space: nowrap; }
-  button.secondary { background: none; color: var(--accent); border: 1px solid var(--line); }
-  button.ghost { background: none; color: var(--danger); margin: 0; padding: 4px 8px; }
-  button.ghost.plain { color: var(--accent); }
-  button.small { margin: 0; padding: 5px 10px; font-size: 13px; }
-  .bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); column-gap: 12px; }
-  .hint { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
-  fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 16px 0 0; padding: 4px 14px 14px; }
-  legend { font-size: 13px; color: var(--muted); padding: 0 4px; }
-  .models { max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-  .models label { display: flex; align-items: center; margin: 3px 0; color: var(--text); font: 13px ui-monospace, monospace; overflow-wrap: anywhere; }
-  .scroll { overflow-x: auto; }
-  table { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
-  td.id { font: 12px ui-monospace, monospace; word-break: break-all; min-width: 150px; }
-  td.multi { white-space: pre-line; }
-  #prices td { padding: 4px; }
-  #prices thead th { position: sticky; top: 0; background: var(--card); z-index: 1; }
-  #prices input { padding: 6px; min-width: 56px; }
-  #prices td:first-child input { min-width: 240px; }
-  #prices td:nth-child(7) input { min-width: 80px; }
-  .tag { color: var(--danger); font-size: 12px; }
-  .result { display: none; margin-top: 16px; padding: 12px; border-radius: 6px; border: 1px dashed var(--accent); }
-  .row { display: flex; align-items: baseline; gap: 4px; margin: 4px 0; }
-  .row > span { white-space: nowrap; }
-  .row code { overflow-wrap: anywhere; }
-  .row button { flex: none; }
-  button.copy { background: none; color: var(--accent); margin: 0 0 0 6px; padding: 0 4px; }
-  code { font: 13px ui-monospace, monospace; }
-  pre { margin: 6px 0 0; padding: 10px; border-radius: 6px; background: var(--bg); overflow-x: auto; }
-  .err { color: var(--danger); margin-top: 10px; }
-  .msg { color: var(--ok); margin-top: 10px; }
-  .empty { color: var(--muted); }
-  .warn { border-color: var(--danger); color: var(--danger); }
-  .days { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; }
-  .days label { display: flex; align-items: center; margin: 0; color: var(--text); font-size: 14px; }
-  textarea { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: 13px/1.5 ui-monospace, monospace; resize: vertical; }
-  ul.plain { list-style: none; padding: 0; margin: 8px 0 0; }
-  ul.plain li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
-</style>
+<link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
 <main>
@@ -74,10 +16,13 @@
     <button type="button" class="secondary small" id="signout" hidden>Sign out</button>
   </div>
   <div class="card warn" id="plaintext" hidden>Real API keys are stored unencrypted. Set the <code>ENCRYPTION_KEY</code> secret (see the README) so new and edited keys are encrypted.</div>
+  <div class="card warn" id="viewerNote" hidden>This is a read-only viewer account: you can see keys, usage and prices, and you cannot create, edit, revoke or export anything.</div>
+  <div class="card warn" id="healthBanner" hidden>Provider down: <span id="healthText"></span>. Calls to those keys will fail until the provider answers again.</div>
+  <div class="card warn" id="passkeyWarning" hidden>This deployment has no passkey, so the admin password is the only thing protecting every key. Keys cannot be created until you add one below, unless the <code>ALLOW_PASSWORD</code> secret is set to <code>true</code> for a password-only deployment.</div>
 
-  <form class="card" id="form">
+  <form class="card" id="form" data-write>
     <div class="head">
-      <h2 id="formTitle">New key</h2>
+      <h2 id="formTitle" tabindex="-1">New key</h2>
       <button type="button" class="secondary small" id="cancel" hidden>Cancel editing</button>
     </div>
     <div class="grid">
@@ -120,7 +65,7 @@
         <button type="button" class="secondary small" id="selectShown">Select shown</button>
         <button type="button" class="secondary small" id="clearModels">Clear</button>
       </div>
-      <div class="err" id="modelErr"></div>
+      <div class="err" id="modelErr" role="alert"></div>
       <div class="models" id="modelList" hidden></div>
       <p class="hint" id="modelCount"></p>
       <label for="patterns">Extra patterns (comma separated; a trailing * matches a prefix)</label>
@@ -129,6 +74,7 @@
 
     <fieldset>
       <legend>Limits (leave empty for none)</legend>
+      <p class="hint" id="limitsHint">Spend and token caps are enforced only where the provider reports token usage: <code>/messages</code>, <code>/chat/completions</code>, <code>/responses</code>, <code>/completions</code>, <code>/embeddings</code> and Gemini's <code>:generateContent</code>. Any other POST path (audio, images, batches, files) is refused with a 403 for a key with a cap. The requests-per-minute limit and the allowed-IP list apply to every path.</p>
       <div class="grid">
         <div>
           <label for="capUsd">Spend cap (USD)</label>
@@ -150,12 +96,19 @@
           <input id="rpm" type="number" min="1" step="1" placeholder="no limit">
         </div>
         <div>
+          <label for="alertAt">Alert at % of cap</label>
+          <input id="alertAt" type="number" min="1" max="100" step="1" placeholder="no alert">
+        </div>
+        <div>
           <label for="maxOutput">Max output tokens per request</label>
           <input id="maxOutput" type="number" min="1" step="1" placeholder="no limit">
         </div>
       </div>
       <label for="ips">Allowed client IPs or CIDR ranges (comma separated)</label>
       <input id="ips" placeholder="any address, or e.g. 203.0.113.0/24, 2001:db8::/32">
+      <div class="days" style="margin-top: 12px">
+        <label for="headerOnly"><input type="checkbox" id="headerOnly"> Header only: a key in a URL cannot sign in</label>
+      </div>
       <div class="grid">
         <div>
           <label for="downAt">Downgrade past this % of a cap</label>
@@ -195,8 +148,10 @@
       </div>
     </div>
 
-    <button id="submit">Create key</button>
-    <div class="err" id="err"></div>
+    <div class="actions">
+      <button id="submit" aria-describedby="err">Create key</button>
+    </div>
+    <div class="err" id="err" role="alert"></div>
     <div class="msg" id="msg"></div>
     <div class="result" id="result">
       <div class="row"><span>Endpoint:</span> <code id="outBase"></code><button type="button" class="copy" data-copy="outBase">copy</button></div>
@@ -214,6 +169,16 @@
       <h2>Keys</h2>
       <button type="button" class="secondary small" id="export">Export usage CSV</button>
     </div>
+    <div class="filters">
+      <input type="search" id="q" placeholder="Search label or provider" aria-label="Search keys by label or provider">
+      <select id="state" aria-label="Filter keys by state">
+        <option value="all">All keys</option>
+        <option value="active">Active</option>
+        <option value="expired">Expired or revoked</option>
+      </select>
+      <label class="check"><input type="checkbox" id="nearCap"> 80%+ of a cap <span class="muted">(this page)</span></label>
+      <span class="muted" id="count" role="status"></span>
+    </div>
     <div class="scroll">
       <table>
         <thead><tr><th>Key</th><th>Forwards to</th><th>Expires</th><th>Limits</th><th>Usage</th><th></th></tr></thead>
@@ -221,6 +186,93 @@
       </table>
     </div>
     <button type="button" class="secondary" id="more" hidden>Load more keys</button>
+  </div>
+
+  <div class="card" data-write>
+    <div class="head">
+      <h2>Viewers</h2>
+    </div>
+    <p class="hint">An invite link lets one person register one passkey, and that passkey can read keys and usage
+      and change nothing. It works once and expires after a day.</p>
+    <form id="inviteForm" class="row">
+      <input id="inviteLabel" aria-label="Who the invite is for" placeholder="name it, such as Sam" maxlength="60">
+      <button type="submit" class="secondary">Create an invite link</button>
+    </form>
+    <p class="err" id="inviteErr" role="alert" hidden></p>
+    <ul class="plain" id="invites"></ul>
+    <p class="hint" id="inviteLink" hidden></p>
+  </div>
+
+  <div class="card" data-write>
+    <div class="head">
+      <h2>Host budgets</h2>
+    </div>
+    <p class="hint">One spend cap shared by every key pointed at the same provider host. Refused at admit time, so a
+      runaway script cannot get past it by using a second key.</p>
+    <form id="groupForm" class="row">
+      <input id="groupHost" aria-label="Provider host" placeholder="api.anthropic.com" required>
+      <input id="groupCap" type="number" min="0" step="0.01" aria-label="Budget in dollars" placeholder="USD, 0 clears" required>
+      <button type="submit" class="secondary">Save budget</button>
+    </form>
+    <p class="err" id="groupErr" role="alert" hidden></p>
+    <ul class="plain" id="groups"></ul>
+  </div>
+
+  <div class="card" id="rotationsCard" data-write hidden>
+    <div class="head">
+      <h2>Rotation requests</h2>
+      <span class="muted" id="rotateCount" role="status"></span>
+    </div>
+    <p class="hint">A key holder asked for a new key. Approving issues one with the same settings and gives the old key an hour of grace; the link below hands over the new value once.</p>
+    <ul class="plain" id="rotations"></ul>
+  </div>
+
+  <div class="card" data-write>
+    <div class="head">
+      <h2>Activity</h2>
+      <a class="hint" href="/admin/audit.csv" download>Download CSV</a>
+    </div>
+    <p class="hint">Who created, edited, revoked, shared or exported what. The newest 500 are kept; nothing here can be edited.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>When</th><th>Who</th><th>What</th><th>Which</th></tr></thead>
+        <tbody id="audit"></tbody>
+      </table>
+    </div>
+    <button type="button" class="secondary" id="moreAudit" hidden>Show 20 more</button>
+  </div>
+
+  <div class="card" id="logCard" hidden>
+    <div class="head">
+      <h2>Recent requests</h2>
+      <span class="muted" role="status" id="logNote"></span>
+    </div>
+    <p class="hint">The last 50 calls, newest first: key prefix, model, status, tokens and latency. Prompt and response text are never stored. This appears only when the <code>REQUEST_LOG</code> secret is <code>true</code>; the same data is at <code>/admin/log</code> and the counts are at <code>/metrics</code>.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>When</th><th>Key</th><th>Model</th><th>Status</th><th>Tokens</th><th>ms</th></tr></thead>
+        <tbody id="logRows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <h2>Report</h2>
+      <select id="reportDays" aria-label="Report window">
+        <option value="1">Today</option>
+        <option value="7" selected>Last 7 days</option>
+        <option value="30">Last 30 days</option>
+      </select>
+    </div>
+    <div class="row" id="reportTotals"></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Model</th><th>Requests</th><th>Input</th><th>Output</th><th>Cost</th></tr></thead>
+        <tbody id="reportModels"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="reportNote"></p>
   </div>
 
   <div class="card">
@@ -236,13 +288,13 @@
         <tbody></tbody>
       </table>
     </div>
-    <div class="bar">
+    <div class="bar" data-write>
       <button type="button" class="secondary" id="addPrice">Add row</button>
       <button type="button" class="secondary" id="resetPrices">Restore defaults</button>
       <button type="button" class="secondary" id="importOpenRouter">Import OpenRouter prices</button>
       <button type="button" id="savePrices">Save prices</button>
     </div>
-    <div class="err" id="priceErr"></div>
+    <div class="err" id="priceErr" role="alert"></div>
     <div class="msg" id="priceMsg"></div>
   </div>
 
@@ -250,430 +302,13 @@
     <h2>Sign-in</h2>
     <p class="hint" id="authHint"></p>
     <ul class="plain" id="passkeys"></ul>
-    <div class="bar">
+    <div class="bar" data-write>
       <input id="passkeyName" placeholder="Name for this passkey, e.g. laptop" style="flex: 1; min-width: 180px; margin-top: 16px" aria-label="Passkey name">
       <button type="button" id="addPasskey">Add a passkey</button>
     </div>
-    <div class="err" id="passkeyErr"></div>
+    <div class="err" id="passkeyErr" role="alert"></div>
   </div>
 </main>
-<script>
-  const $ = (id) => document.getElementById(id);
-  const endpoint = location.origin + "/v1";
-  const pad = (n) => String(n).padStart(2, "0");
-  const local = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const thisMonth = () => new Date().toISOString().slice(0, 7);
-  const usd = (n) => "$" + n.toFixed(n && n < 0.01 ? 6 : 4);
-  const el = (tag, props = {}, ...kids) => {
-    const node = Object.assign(document.createElement(tag), props);
-    node.append(...kids);
-    return node;
-  };
-
-  const PRESETS = [
-    ["Anthropic", "https://api.anthropic.com/v1", "x-api-key"],
-    ["OpenAI", "https://api.openai.com/v1", "bearer"],
-    ["Google Gemini (OpenAI-compatible)", "https://generativelanguage.googleapis.com/v1beta/openai", "bearer"],
-    ["DeepSeek", "https://api.deepseek.com", "bearer"],
-    ["xAI", "https://api.x.ai/v1", "bearer"],
-    ["Mistral", "https://api.mistral.ai/v1", "bearer"],
-    ["Groq", "https://api.groq.com/openai/v1", "bearer"],
-    ["Cerebras", "https://api.cerebras.ai/v1", "bearer"],
-    ["Together AI", "https://api.together.xyz/v1", "bearer"],
-    ["Fireworks AI", "https://api.fireworks.ai/inference/v1", "bearer"],
-    ["Moonshot (Kimi)", "https://api.moonshot.ai/v1", "bearer"],
-    ["Zhipu (GLM)", "https://open.bigmodel.cn/api/paas/v4", "bearer"],
-    ["Alibaba Qwen (DashScope international)", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "bearer"],
-    ["Cohere (OpenAI-compatible)", "https://api.cohere.ai/compatibility/v1", "bearer"],
-    ["OpenRouter", "https://openrouter.ai/api/v1", "bearer"],
-  ];
-  $("provider").append(el("option", { value: "", textContent: "Custom endpoint" }), ...PRESETS.map(([name], i) => el("option", { value: i, textContent: name })));
-  $("provider").onchange = () => {
-    const p = PRESETS[$("provider").value];
-    if (p) [$("base").value, $("auth").value] = [p[1], p[2]];
-  };
-  const hostAuth = { "api.anthropic.com": "x-api-key", "generativelanguage.googleapis.com": "bearer" };
-  $("base").oninput = () => {
-    const base = $("base").value.trim().replace(/\/+$/, "");
-    const i = PRESETS.findIndex((p) => p[1] === base);
-    $("provider").value = i < 0 ? "" : i;
-    let host = "";
-    try { host = new URL(base).hostname; } catch {}
-    const style = hostAuth[host] || (host.endsWith(".openai.azure.com") ? "api-key" : null);
-    if (style) $("auth").value = style;
-  };
-
-  async function send(path, method, body) {
-    const res = await fetch(path, { method, headers: { "content-type": "application/json" }, body: body && JSON.stringify(body) });
-    const data = await res.json().catch(() => ({ error: { message: `request failed (${res.status})` } }));
-    if (!res.ok) throw new Error(data.error?.message || `request failed (${res.status})`);
-    return data;
-  }
-
-  // Model picker: checked names are allowed exactly; an empty selection with no patterns allows every model.
-  const selected = new Set();
-  let available = [];
-  function renderModels() {
-    const q = $("modelFilter").value.trim().toLowerCase();
-    const names = [...new Set([...available, ...selected])].sort();
-    $("modelList").hidden = !names.length;
-    $("modelList").replaceChildren(...names.filter((n) => n.toLowerCase().includes(q)).map((n) => {
-      const box = el("input", { type: "checkbox", checked: selected.has(n) });
-      box.onchange = () => { box.checked ? selected.add(n) : selected.delete(n); renderModels(); };
-      return el("label", {}, box, n);
-    }));
-    $("modelCount").textContent = selected.size
-      ? `${selected.size} model${selected.size > 1 ? "s" : ""} selected; requests for other models are refused.`
-      : "No models selected: every model is allowed unless a pattern is set.";
-  }
-  const shownModels = () => [...$("modelList").querySelectorAll("label")].map((l) => l.textContent);
-  $("modelFilter").oninput = renderModels;
-  $("selectShown").onclick = () => { shownModels().forEach((n) => selected.add(n)); renderModels(); };
-  $("clearModels").onclick = () => { selected.clear(); renderModels(); };
-  $("loadModels").onclick = async () => {
-    $("modelErr").textContent = "";
-    const key = $("key").value.trim();
-    const body = { base: $("base").value.trim(), auth: $("auth").value };
-    if (key) body.key = key;
-    else if (editing || copying) body.id = (editing || copying).id;
-    $("loadModels").disabled = true;
-    try {
-      available = (await send("/admin/models", "POST", body)).models;
-      if (!available.length) $("modelErr").textContent = "The provider returned no models; add names under Extra patterns.";
-    } catch (e) {
-      $("modelErr").textContent = e.message + ". You can still type model names under Extra patterns.";
-    }
-    $("loadModels").disabled = false;
-    renderModels();
-  };
-
-  let editing = null;
-  let copying = null;
-  const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  $("days").append(...DAY_NAMES.map((d, i) => el("label", {}, el("input", { type: "checkbox", value: i }), d)));
-  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  $("zones").append(...(Intl.supportedValuesOf?.("timeZone") || []).map((z) => el("option", { value: z })));
-  let keys = [];
-  const NUMBERS = ["capUsd", "capTokens", "rpm", "maxOutput"];
-  function resetForm() {
-    editing = copying = null;
-    $("form").reset();
-    $("expires").value = local(new Date(Date.now() + 864e5));
-    $("key").required = true;
-    $("key").placeholder = "";
-    $("formTitle").textContent = "New key";
-    $("submit").textContent = "Create key";
-    $("cancel").hidden = true;
-    $("countRow").hidden = false;
-    $("tz").value = browserZone;
-    $("batch").style.display = "none";
-    selected.clear();
-    available = [];
-    renderModels();
-  }
-  // Fills the form from a key, to edit it or to create a copy that reuses its real key.
-  function editKey(k, copy) {
-    resetForm();
-    if (copy) copying = k;
-    else editing = k;
-    $("base").value = k.base;
-    $("base").oninput();
-    $("auth").value = k.auth || "bearer";
-    $("key").required = false;
-    $("key").placeholder = copy ? "leave empty to reuse the copied key's real key" : "leave empty to keep the current key";
-    if (!copy) $("expires").value = local(new Date(k.expires));
-    $("label").value = k.label || "";
-    for (const f of NUMBERS) $(f).value = k[f] ?? "";
-    $("period").value = k.period || "total";
-    $("ips").value = (k.ips || []).join(", ");
-    $("downAt").value = k.downgrade?.at ?? "";
-    $("downMap").value = (k.downgrade?.map || []).map(([a, b]) => `${a} => ${b}`).join("\n");
-    for (const box of $("days").querySelectorAll("input")) box.checked = !!k.hours?.days.includes(Number(box.value));
-    if (k.hours) [$("start").value, $("end").value, $("tz").value] = [k.hours.start, k.hours.end, k.hours.tz];
-    $("countRow").hidden = !copy;
-    for (const m of k.models || []) if (!m.endsWith("*")) selected.add(m);
-    $("patterns").value = (k.models || []).filter((m) => m.endsWith("*")).join(", ");
-    $("formTitle").textContent = (copy ? "New key, copied from " : "Edit ") + (k.label || k.id);
-    $("submit").textContent = copy ? "Create key" : "Save changes";
-    $("cancel").hidden = false;
-    $("result").style.display = "none";
-    renderModels();
-    $("form").scrollIntoView({ behavior: "smooth" });
-  }
-  $("cancel").onclick = resetForm;
-
-  $("form").onsubmit = async (e) => {
-    e.preventDefault();
-    $("err").textContent = $("msg").textContent = "";
-    const list = (id, sep) => $(id).value.split(sep).map((s) => s.trim()).filter(Boolean);
-    const payload = {
-      base: $("base").value.trim(),
-      auth: $("auth").value,
-      label: $("label").value.trim(),
-      period: $("period").value,
-      ips: list("ips", /[\s,]+/),
-      models: [...selected, ...list("patterns", ",")],
-    };
-    const days = [...$("days").querySelectorAll("input:checked")].map((b) => Number(b.value));
-    payload.hours = days.length ? { days, start: $("start").value, end: $("end").value, tz: $("tz").value.trim() } : null;
-    const rules = $("downMap").value.split("\n").map((l) => l.split("=>").map((x) => x.trim())).filter((p) => p[0]);
-    if (rules.some((p) => p.length !== 2 || !p[1])) return ($("err").textContent = "Write each downgrade rule as: requested model => cheaper model");
-    payload.downgrade = $("downAt").value || rules.length ? { at: Number($("downAt").value), map: rules } : null;
-    if (!editing) payload.count = Number($("count").value) || 1;
-    for (const f of NUMBERS) payload[f] = $(f).value === "" ? null : Number($(f).value);
-    if ($("key").value.trim()) payload.key = $("key").value.trim();
-    else if (copying) payload.from = copying.id;
-    let data;
-    try {
-      payload.expires = new Date($("expires").value).toISOString();
-      data = await send(editing ? "/admin/keys/" + editing.id : "/admin/keys", editing ? "PATCH" : "POST", payload);
-    } catch (err) {
-      return ($("err").textContent = err.message === "Invalid time value" ? "Pick an expiry date and time." : err.message);
-    }
-    if (editing) {
-      resetForm();
-      $("msg").textContent = "Saved changes to " + (data.label || data.id) + ".";
-    } else if (data.keys) {
-      batchKeys = data.keys;
-      $("result").style.display = "none";
-      $("batchText").textContent = `Created ${data.keys.length} keys. Download them now; the list below shows them too.`;
-      $("batch").style.display = "block";
-      $("key").value = "";
-    } else {
-      $("outBase").textContent = endpoint;
-      $("outKey").textContent = data.id;
-      $("outSettings").textContent = JSON.stringify({
-        env: { ANTHROPIC_API_KEY: data.id, ANTHROPIC_BASE_URL: location.origin, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1" },
-        permissions: { allow: [], deny: [] },
-      }, null, 2);
-      $("result").style.display = "block";
-      $("key").value = "";
-    }
-    load();
-  };
-
-  function usage(u) {
-    const total = Object.entries(u.total || {});
-    if (!total.length) return "none";
-    const sum = (bucket) => Object.values(bucket || {}).reduce((s, m) => s + m.cost, 0);
-    const month = Object.values(u.months?.[thisMonth()] || {});
-    return `Lifetime ${usd(sum(u.total))}\nThis month ${usd(sum(u.months?.[thisMonth()]))} (${month.reduce((s, m) => s + m.requests, 0)} req)\n` +
-      total.map(([m, x]) => `${m}: ${x.priced ? usd(x.cost) : "unpriced"} (${x.requests} req, ${x.input.toLocaleString()} in / ${x.output.toLocaleString()} out)`).join("\n");
-  }
-
-  let cursor = null;
-  const fetchKeys = async (from) => (await fetch("/admin/keys" + (from ? "?cursor=" + encodeURIComponent(from) : ""))).json();
-  const full = async (k) => {
-    const res = await fetch("/admin/keys/" + k.id);
-    return res.ok ? res.json() : Promise.reject(new Error("could not load " + k.id));
-  };
-  async function load(more) {
-    if (!more) {
-      keys = [];
-      $("list").replaceChildren();
-    }
-    const page = await fetchKeys(more ? cursor : null);
-    cursor = page.cursor;
-    $("more").hidden = !cursor;
-    keys.push(...page.keys);
-    if (!keys.length) $("list").replaceChildren(el("tr", {}, el("td", { colSpan: 6, className: "empty", textContent: "No keys" })));
-    for (const k of page.keys) $("list").append(keyRow(k));
-  }
-  $("more").onclick = () => load(true);
-  const action = (text, onclick, danger) => [el("button", { className: danger ? "ghost" : "ghost plain", textContent: text, onclick }), el("br")];
-  function keyRow(k) {
-    const id = el("td", { className: "id" }, ...(k.label ? [el("strong", { textContent: k.label, style: "font-family: system-ui, sans-serif" }), el("br")] : []), k.id);
-    const exp = el("td", { textContent: new Date(k.expires).toLocaleString() });
-    if (!k.active) exp.append(el("div", { className: "tag", textContent: "expired" }));
-    const actions = el("td");
-    if (k.active) {
-      actions.append(
-        ...action("Edit", async () => editKey(await full(k))),
-        ...action("Duplicate", async () => editKey(await full(k), true)),
-        ...action("Share link", async () => {
-          try {
-            const { url, expires } = await send(`/admin/keys/${k.id}/share`, "POST", {});
-            prompt(`One-time link for ${k.label || k.id}. It shows the key once and stops working after ${new Date(expires).toLocaleString()}.`, url);
-          } catch (e) {
-            alert(e.message);
-          }
-        }),
-        ...action("Reset usage", async () => {
-          if (!confirm("Reset the usage totals of " + (k.label || k.id) + "? Its caps start counting from zero.")) return;
-          await fetch(`/admin/keys/${k.id}/usage`, { method: "DELETE" });
-          load();
-        }),
-      );
-    }
-    actions.append(el("button", {
-      className: "ghost",
-      textContent: k.active ? "Revoke" : "Delete",
-      onclick: async () => {
-        if (!confirm((k.active ? "Revoke " : "Delete ") + (k.label || k.id) + "? This cannot be undone.")) return;
-        await fetch("/admin/keys/" + k.id, { method: "DELETE" });
-        if (editing?.id === k.id) resetForm();
-        load();
-      },
-    }));
-    return el("tr", {}, id, el("td", { textContent: k.base }), exp,
-      el("td", { className: "multi", textContent: k.limits || "" }), el("td", { className: "multi", textContent: usage(k.usage) }), actions);
-  }
-
-  let batchKeys = [];
-  const download = (name, rows) => {
-    const a = el("a", { href: URL.createObjectURL(new Blob([rows.map((r) => r.map(cell).join(",")).join("\n") + "\n"], { type: "text/csv" })), download: name });
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  $("batchCsv").onclick = () => download("key-router-keys.csv", [["label", "key", "endpoint", "expires"], ...batchKeys.map((k) => [k.label, k.id, endpoint, k.expires])]);
-
-  // Cells starting with = + - @ are prefixed so spreadsheets do not run them as formulas.
-  const cell = (v) => {
-    let s = String(v);
-    if (/^[=+\-@]/.test(s)) s = "'" + s;
-    return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
-  };
-  $("export").onclick = async () => {
-    const all = [];
-    let from = null;
-    do {
-      const page = await fetchKeys(from);
-      all.push(...page.keys);
-      from = page.cursor;
-    } while (from);
-    const rows = [["key", "label", "month", "model", "requests", "input_tokens", "output_tokens", "cost_usd", "priced"]];
-    for (const k of all) {
-      for (const [month, models] of Object.entries(k.usage.months || {}).sort()) {
-        for (const [model, u] of Object.entries(models)) rows.push([k.id, k.label || "", month, model, u.requests, u.input, u.output, u.cost.toFixed(6), u.priced]);
-      }
-      // Usage recorded before monthly tracking existed only has lifetime totals.
-      for (const [model, t] of Object.entries(k.usage.total || {})) {
-        const seen = Object.values(k.usage.months || {}).map((m) => m[model]).filter(Boolean);
-        const less = (f) => t[f] - seen.reduce((s, m) => s + m[f], 0);
-        if (less("requests") > 0) rows.push([k.id, k.label || "", "before monthly tracking", model, less("requests"), less("input"), less("output"), less("cost").toFixed(6), t.priced]);
-      }
-    }
-    download(`key-router-usage-${new Date().toISOString().slice(0, 10)}.csv`, rows);
-  };
-
-  const PRICE_COLS = ["match", "in", "out", "read", "write5m", "write1h", "longAbove", "longScale", "fast"];
-  const PRICE_NAMES = ["Model name contains", "Input", "Output", "Cache read", "5m write", "1h write", "Long above", "Long multiplier", "Fast multiplier"];
-  let defaults = [];
-  function renderPrices(rows) {
-    $("prices").tBodies[0].replaceChildren(...rows.map((r) => {
-      const tr = el("tr", {}, ...PRICE_COLS.map((c, i) => {
-        const input = el("input", { value: r[c] ?? "", type: i ? "number" : "text", min: 0, step: "any", required: i < 6 });
-        input.setAttribute("aria-label", PRICE_NAMES[i]);
-        input.dataset.col = c;
-        return el("td", {}, input);
-      }));
-      tr.append(el("td", {}, el("button", { type: "button", className: "ghost", textContent: "Remove", onclick: () => tr.remove() })));
-      return tr;
-    }));
-  }
-  const readPrices = () => [...$("prices").tBodies[0].rows].map((tr) =>
-    Object.fromEntries([...tr.querySelectorAll("input")].map((i) => [i.dataset.col, i.dataset.col === "match" ? i.value : i.value === "" ? null : Number(i.value)])));
-  const filterPrices = () => {
-    const q = $("priceFilter").value.trim().toLowerCase();
-    for (const tr of $("prices").tBodies[0].rows) tr.hidden = !!q && !tr.querySelector("input").value.toLowerCase().includes(q);
-  };
-  $("priceFilter").oninput = filterPrices;
-  $("addPrice").onclick = () => {
-    $("priceFilter").value = "";
-    renderPrices([...readPrices(), { match: "" }]);
-    $("prices").tBodies[0].lastElementChild.querySelector("input").focus();
-  };
-  $("resetPrices").onclick = () => renderPrices(structuredClone(defaults));
-  $("importOpenRouter").onclick = async () => {
-    $("priceErr").textContent = $("priceMsg").textContent = "";
-    try {
-      const imported = (await send("/admin/prices/openrouter", "GET")).prices;
-      const names = new Set(imported.map((r) => r.match));
-      renderPrices([...readPrices().filter((r) => !names.has(r.match)), ...imported]);
-      filterPrices();
-      $("priceMsg").textContent = `Added or updated ${imported.length} OpenRouter models. Review them, then save. OpenRouter's own reported cost is used for its requests when available.`;
-    } catch (e) {
-      $("priceErr").textContent = e.message;
-    }
-  };
-  $("savePrices").onclick = async () => {
-    $("priceErr").textContent = $("priceMsg").textContent = "";
-    try {
-      renderPrices((await send("/admin/prices", "PUT", { prices: readPrices() })).prices);
-      $("priceMsg").textContent = "Prices saved.";
-    } catch (e) {
-      $("priceErr").textContent = e.message;
-    }
-  };
-  (async () => {
-    const data = await (await fetch("/admin/prices")).json();
-    defaults = data.defaults;
-    renderPrices(data.prices);
-  })();
-
-  async function loadAuth() {
-    const status = await (await fetch("/admin/status")).json();
-    $("plaintext").hidden = status.encrypted;
-    $("signout").hidden = !status.passkeys;
-    $("authHint").textContent = status.passkeys
-      ? "Passkeys are required to sign in. The admin password no longer works" + (status.passwordFallback ? ", except that ALLOW_PASSWORD is set, so it still does." : ". Keep at least two passkeys so losing one does not lock you out.")
-      : "You sign in with the admin password. Add a passkey to sign in with your fingerprint, face or a security key instead; the password then stops working.";
-    const list = await (await fetch("/admin/passkeys")).json();
-    $("passkeys").replaceChildren(...list.map((p) => el("li", {},
-      el("span", { textContent: `${p.name} (added ${new Date(p.created).toLocaleDateString()})` }),
-      el("button", {
-        className: "ghost",
-        textContent: "Remove",
-        onclick: async () => {
-          if (!confirm(`Remove the passkey "${p.name}"?` + (list.length === 1 ? " The admin password will work again." : ""))) return;
-          await fetch("/admin/passkeys/" + p.id, { method: "DELETE" });
-          loadAuth();
-        },
-      }))));
-  }
-  const b64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-  const unb64u = (s) => Uint8Array.from(atob(s.replaceAll("-", "+").replaceAll("_", "/")), (c) => c.charCodeAt(0));
-  $("addPasskey").onclick = async () => {
-    $("passkeyErr").textContent = "";
-    try {
-      const o = await send("/admin/passkeys/options", "POST", {});
-      const cred = await navigator.credentials.create({ publicKey: {
-        challenge: unb64u(o.challenge),
-        rp: o.rp,
-        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "admin", displayName: "KeyRouter admin" },
-        pubKeyCredParams: [-7, -8, -257].map((alg) => ({ type: "public-key", alg })),
-        authenticatorSelection: { residentKey: "required", userVerification: "required" },
-        excludeCredentials: o.exclude.map((id) => ({ type: "public-key", id: unb64u(id) })),
-        timeout: 60000,
-      } });
-      const r = cred.response;
-      if (!r.getPublicKey) throw new Error("This browser cannot register passkeys here; try a current Chrome, Edge, Safari or Firefox.");
-      await send("/admin/passkeys", "POST", {
-        id: cred.id,
-        clientDataJSON: b64u(r.clientDataJSON),
-        publicKey: b64u(r.getPublicKey()),
-        alg: r.getPublicKeyAlgorithm(),
-        name: $("passkeyName").value.trim() || "Passkey",
-      });
-      $("passkeyName").value = "";
-      loadAuth();
-    } catch (e) {
-      $("passkeyErr").textContent = e.name === "NotAllowedError" ? "Passkey creation was cancelled or timed out." : e.message;
-    }
-  };
-  $("signout").onclick = async () => {
-    await fetch("/admin/logout", { method: "POST" });
-    location.reload();
-  };
-  loadAuth();
-
-  document.querySelectorAll("[data-copy]").forEach((b) => (b.onclick = async () => {
-    await navigator.clipboard.writeText($(b.dataset.copy).textContent);
-    b.textContent = "copied";
-    setTimeout(() => (b.textContent = "copy"), 1200);
-  }));
-  resetForm();
-  load();
-</script>
+<script src="/admin/admin.js" defer></script>
 </body>
 </html>

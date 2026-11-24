@@ -6,11 +6,14 @@
 <meta name="referrer" content="no-referrer">
 <title>Key usage</title>
 <style>
-  :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc; --accent: #2f5bea; --danger: #c43c2b; }
+  :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc; --accent: #2f5bea; --danger: #c43c2b; --ok: #2b7a3d; --on-accent: #ffffff; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #151514; --card: #1f1f1d; --text: #ececE8; --muted: #9a9a93; --line: #33332f; --accent: #7d9bff; --danger: #ff7a68; }
+    :root { --bg: #151514; --card: #1f1f1d; --text: #ececE8; --muted: #9a9a93; --line: #33332f; --accent: #7d9bff; --danger: #ff7a68; --ok: #6fcf86; --on-accent: #10131c; }
   }
   * { box-sizing: border-box; }
+  /* A visible focus ring on every control: the default ring disappears on some of these backgrounds. */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--accent); }
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
   main { max-width: 560px; margin: 0 auto; padding: 48px 16px; }
@@ -19,9 +22,13 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
   label { display: block; font-size: 13px; color: var(--muted); margin: 0 0 4px; }
   input { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font: inherit; }
-  button { margin-top: 16px; padding: 9px 16px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+  button { margin-top: 16px; padding: 9px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--on-accent); font: inherit; cursor: pointer; }
   button.copy { background: none; color: var(--accent); margin: 0 0 0 6px; padding: 0 4px; }
+  button.ghost { background: none; color: var(--accent); border: 1px solid var(--line); margin-left: 8px; }
+  button.ghost:disabled { color: var(--muted); cursor: default; }
   .err { color: var(--danger); margin-top: 12px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 20px 0 0; }
+  .hint code { color: var(--text); }
   .row { display: flex; align-items: baseline; gap: 4px; margin: 6px 0; }
   .row > span { white-space: nowrap; color: var(--muted); }
   .row code { overflow-wrap: anywhere; }
@@ -32,6 +39,12 @@
   dd { margin: 0; overflow-wrap: anywhere; }
   .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 4px; }
   .bar > div { height: 100%; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 14px; }
+  caption { text-align: left; color: var(--muted); font-size: 13px; padding-bottom: 6px; }
+  th, td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  th { color: var(--muted); font-weight: 500; font-size: 13px; }
+  td:last-child, th:last-child { text-align: right; padding-right: 0; }
+  td.model { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -40,11 +53,19 @@
   <p class="sub">Check what your gateway key has used and what it has left. The key is only sent to this gateway.</p>
   <form class="card" id="form">
     <label for="key">Gateway key</label>
-    <input id="key" autocomplete="off" placeholder="sk-gw-..." required>
+    <input id="key" autocomplete="off" aria-describedby="err" placeholder="sk-gw-..." required>
     <button>Check</button>
-    <div class="err" id="err"></div>
+    <button type="button" class="ghost" id="rotate" hidden>Request a new key</button>
+    <div class="err" id="err" role="alert"></div>
+    <p class="hint" id="rotateNote" hidden></p>
     <dl id="out" hidden></dl>
+    <table id="models" hidden>
+      <caption>Spend by model, most expensive first</caption>
+      <thead><tr><th scope="col">Model</th><th scope="col">Requests</th><th scope="col">Input</th><th scope="col">Output</th><th scope="col">Cost</th></tr></thead>
+      <tbody id="modelRows"></tbody>
+    </table>
   </form>
+  <p class="hint">Send the key in a header: <code>Authorization: Bearer</code> for the OpenAI SDKs, <code>x-api-key</code> for Anthropic and Claude Code, <code>api-key</code> for Azure and <code>x-goog-api-key</code> for Gemini. A key in the query string is refused unless the gateway sets <code>ALLOW_QUERY_KEY=true</code>, and never works for a header-only key.</p>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -77,9 +98,28 @@
     row("Tokens" + per, num(u.used.tokens) + (u.limits.capTokens ? ` of ${num(u.limits.capTokens)} (${num(u.remaining.tokens)} left)` : ""), u.limits.capTokens ? u.used.tokens / u.limits.capTokens : null);
     if (u.limits.rpm) row("Rate limit", `${u.limits.rpm} requests per minute`);
     if (u.limits.maxOutput) row("Max output", `${num(u.limits.maxOutput)} tokens per request`);
+    if (u.reset) row("Resets", new Date(u.reset).toLocaleDateString(undefined, { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }) + " (UTC)");
     row("Models", u.models.length ? u.models.join(", ") : "any");
     if (u.hours) row("Works", `${u.hours.days.map((d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ")} ${u.hours.start}-${u.hours.end} (${u.hours.tz})`);
     if (u.downgrade) row("Downgrade", `past ${u.downgrade.at}% of the cap: ` + u.downgrade.map.map(([a, b]) => `${a} to ${b}`).join(", "));
+    const cell = (text, className) => Object.assign(document.createElement("td"), { textContent: text, className: className || "" });
+    $("modelRows").replaceChildren(...u.breakdown.map((m) => {
+      const tr = document.createElement("tr");
+      tr.append(cell(m.model, "model"), cell(num(m.requests)), cell(num(m.input)), cell(num(m.output)), cell(usd(m.cost) + (m.priced ? "" : " unpriced")));
+      return tr;
+    }));
+    $("models").hidden = !u.breakdown.length;
+    // Only a live key can ask for a replacement, and the ask is one POST: the owner issues the new key.
+    $("rotate").hidden = !u.active;
+    $("rotate").onclick = async () => {
+      $("rotate").disabled = true;
+      const asked = await fetch("/usage/rotate", { method: "POST", headers: { authorization: "Bearer " + $("key").value.trim() } });
+      const answer = await asked.json();
+      $("rotateNote").hidden = false;
+      $("rotateNote").textContent = asked.ok ? answer.note : answer.error.message;
+      $("rotate").textContent = asked.ok ? "Requested" : "Request a new key";
+      $("rotate").disabled = !asked.ok;
+    };
     $("out").hidden = false;
   };
   if ($("key").value) $("form").requestSubmit();
